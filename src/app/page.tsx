@@ -3,9 +3,12 @@
 import axios from "axios";
 import axiosRetry from "axios-retry";
 import { useEffect, useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 const MAX_FILES = 30;
 const BASE_URL = "https://mintlify-take-home.com";
+
+const ICON_SIZE = 16;
 
 // API client information
 const bearerToken =
@@ -183,11 +186,16 @@ const FileTree = ({ nodes, onFileClick, onCloseClick }: FileTreeProps) => {
 const FileNode = ({ node, onFileClick, onCloseClick }: FileNodeProps) => {
   const [open, setOpen] = useState(false);
 
+  const Icon = open ? ChevronDown : ChevronRight;
+
   if (node.type === "folder") {
     return (
       <li>
         <div onClick={() => setOpen(!open)} style={{ cursor: "pointer" }}>
-          📁 {node.name}
+          <div className="flex items-center hover:bg-gray-700 rounded-md">
+            <Icon size={ICON_SIZE} />
+            <div>📁 {node.name}</div>
+          </div>
         </div>
         {open && node.children && (
           <FileTree
@@ -202,7 +210,13 @@ const FileNode = ({ node, onFileClick, onCloseClick }: FileNodeProps) => {
 
   return (
     <li>
-      <div onClick={() => onFileClick(node.original!)}>📄 {node.name}</div>
+      <div
+        className="hover:bg-gray-700 rounded-md"
+        onClick={() => onFileClick(node.original!)}
+        style={{ paddingLeft: ICON_SIZE, cursor: "pointer" }}
+      >
+        📄 {node.name}
+      </div>
     </li>
   );
 };
@@ -262,7 +276,7 @@ export default function Home() {
   }
 
   return (
-    <div className="p-16">
+    <div className="p-16 px-32">
       <div
         className="flex rounded-lg border border-gray-600"
         style={{ height: "80vh" }}
