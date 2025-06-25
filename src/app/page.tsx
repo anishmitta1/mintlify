@@ -7,9 +7,23 @@ import { useEffect, useState } from "react";
 const MAX_FILES = 30;
 const BASE_URL = "https://mintlify-take-home.com";
 
+// API client information
 const bearerToken =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFuaXNobWl0dGE1OTNAZ21haWwuY29tIiwiYXNzZXNzbWVudCI6ImZ1bGxfc3RhY2siLCJjcmVhdGVkX2F0IjoiMjAyNS0wNi0yNVQxNDoxNDoxNy44NzExMjc1MzlaIiwiaWF0IjoxNzUwODYwODU3fQ.Eb7wHcWHcHKthQkaozsenU14MdTIkdOsRcohc71L8dA";
 
+const axiosClient = axios.create({
+  baseURL: BASE_URL,
+  headers: {
+    "X-API-Key": bearerToken,
+  },
+});
+
+axiosRetry(axiosClient, {
+  retries: 3,
+  retryDelay: (retryCount) => retryCount * 1000,
+});
+
+// Types and Interfaces
 type File = {
   metadata: {
     checksum: string;
@@ -27,18 +41,25 @@ type FileNode = {
   original?: File; // reference to the original object
 };
 
-const axiosClient = axios.create({
-  baseURL: BASE_URL,
-  headers: {
-    "X-API-Key": bearerToken,
-  },
-});
+interface FileTreeProps {
+  nodes: FileNode[];
+  onFileClick: (file: File) => void;
+  onCloseClick: () => void;
+}
 
-axiosRetry(axiosClient, {
-  retries: 3,
-  retryDelay: (retryCount) => retryCount * 1000,
-});
+interface FileNodeProps {
+  node: FileNode;
+  onFileClick: (file: File) => void;
+  onCloseClick: () => void;
+}
 
+interface FilePreviewProps {
+  file: File | null;
+  hiddenKey: string;
+  closePreview: () => void;
+}
+
+// Utility functions
 const deduplicateFiles = (files: File[]) =>
   files.filter(
     (file, index, self) => index === self.findIndex((t) => t.path === file.path)
@@ -56,29 +77,6 @@ const fetchFiles = async (files: File[]): Promise<File> => {
   });
 
   return response.data;
-};
-
-const useFiles = () => {
-  const [files, setFiles] = useState<File[]>([]);
-
-  const accumulateFiles = async () => {
-    const file = await fetchFiles(files);
-
-    if (validateFile(file)) {
-      setFiles((files) => deduplicateFiles([...files, file]));
-    } else {
-      // Invalid file, retry
-      accumulateFiles();
-    }
-  };
-
-  useEffect(() => {
-    if (files.length < MAX_FILES) {
-      accumulateFiles();
-    }
-  }, [files]);
-
-  return files.length === MAX_FILES ? sortFiles(files) : [];
 };
 
 const buildFileTree = (files: File[]): FileNode[] => {
@@ -114,18 +112,59 @@ const buildFileTree = (files: File[]): FileNode[] => {
 
   return root;
 };
-interface FileTreeProps {
-  nodes: FileNode[];
-  onFileClick: (file: File) => void;
-  onCloseClick: () => void;
-}
 
-interface FileNodeProps {
-  node: FileNode;
-  onFileClick: (file: File) => void;
-  onCloseClick: () => void;
-}
+// Hooks
+const useFiles = () => {
+  const [files, setFiles] = useState<File[]>([]);
 
+  const accumulateFiles = async (files: File[]) => {
+    const file = await fetchFiles(files);
+
+    if (validateFile(file)) {
+      setFiles((files) => deduplicateFiles([...files, file]));
+    } else {
+      // Invalid file, retry
+      accumulateFiles(files);
+    }
+  };
+
+  useEffect(() => {
+    if (files.length < MAX_FILES) {
+      accumulateFiles(files);
+    }
+  }, [files]);
+
+  return files.length === MAX_FILES ? sortFiles(files) : [];
+};
+
+const useImage = (file: File | null, hiddenKey: string) => {
+  const [image, setImage] = useState<string | null>(null);
+
+  const getImage = async (file: File, hiddenKey: string) => {
+    const cdnResponse = await axiosClient.get(`/api/cdn?path=${file.path}`, {
+      headers: {
+        "X-Hidden-Key": hiddenKey,
+      },
+    });
+
+    const imageResponse = await axios.get(cdnResponse.data);
+
+    setImage(`data:image/png;base64,${imageResponse.data}`);
+  };
+
+  useEffect(() => {
+    if (!file || !hiddenKey) {
+      setImage(null);
+      return;
+    }
+
+    getImage(file, hiddenKey);
+  }, [file, hiddenKey]);
+
+  return image;
+};
+
+// Components
 const FileTree = ({ nodes, onFileClick, onCloseClick }: FileTreeProps) => {
   return (
     <ul style={{ listStyle: "none", paddingLeft: 16 }}>
@@ -168,38 +207,7 @@ const FileNode = ({ node, onFileClick, onCloseClick }: FileNodeProps) => {
   );
 };
 
-interface FilePreviewProps {
-  file: File | null;
-  hiddenKey: string;
-}
-
-const useImage = (file: File | null, hiddenKey: string) => {
-  const [image, setImage] = useState<string | null>(null);
-
-  const getImage = async (file: File) => {
-    const cdnResponse = await axiosClient.get(`/api/cdn?path=${file.path}`, {
-      headers: {
-        "X-Hidden-Key": hiddenKey,
-      },
-    });
-
-    const imageResponse = await axios.get(cdnResponse.data);
-
-    setImage(`data:image/png;base64,${imageResponse.data}`);
-  };
-
-  useEffect(() => {
-    if (!file || !hiddenKey) {
-      return;
-    }
-
-    getImage(file);
-  }, [file, hiddenKey]);
-
-  return image;
-};
-
-const FilePreview = ({ file, hiddenKey }: FilePreviewProps) => {
+const FilePreview = ({ file, hiddenKey, closePreview }: FilePreviewProps) => {
   const image = useImage(file, hiddenKey);
 
   if (!file) {
@@ -211,12 +219,17 @@ const FilePreview = ({ file, hiddenKey }: FilePreviewProps) => {
   }
 
   return (
-    <div style={{ width: 300, height: 300 }}>
+    <div
+      className="flex items-start space-x-2"
+      style={{ width: 300, height: 300 }}
+    >
       <img src={image} alt={file.path} />
+      <button onClick={closePreview}>Close</button>
     </div>
   );
 };
 
+// Main component
 export default function Home() {
   const [activeFile, setActiveFile] = useState<File | null>(null);
   const files = useFiles();
@@ -242,7 +255,13 @@ export default function Home() {
           onFileClick={onFileClick}
           onCloseClick={onCloseClick}
         />
-        <FilePreview file={activeFile} hiddenKey={hiddenKey} />
+        <div className="flex justify-center" style={{ flex: 1 }}>
+          <FilePreview
+            file={activeFile}
+            hiddenKey={hiddenKey}
+            closePreview={onCloseClick}
+          />
+        </div>
       </div>
     </div>
   );
