@@ -3,7 +3,7 @@
 import axios from "axios";
 import axiosRetry from "axios-retry";
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, X } from "lucide-react";
 
 const MAX_FILES = 30;
 const BASE_URL = "https://mintlify-take-home.com";
@@ -244,14 +244,13 @@ const FilePreview = ({ file, hiddenKey, closePreview }: FilePreviewProps) => {
     <div className="w-full flex flex-col">
       <div className="p-2 flex items-center justify-between border-b border-gray-600">
         <div>{file.path}</div>
-        <button onClick={closePreview}>Close</button>
+        <button onClick={closePreview} style={{ cursor: "pointer" }}>
+          <X />
+        </button>
       </div>
       <div className="flex flex-1 justify-center items-center">
-        <img
-          src={image}
-          alt={file.path}
-          style={{ objectFit: "contain", width: "30vw" }}
-        />
+        {/* Need to figure out why larger portrait images still overflow :( */}
+        <img src={image} alt={file.path} style={{ objectFit: "contain" }} />
       </div>
     </div>
   );
