@@ -211,20 +211,34 @@ const FilePreview = ({ file, hiddenKey, closePreview }: FilePreviewProps) => {
   const image = useImage(file, hiddenKey);
 
   if (!file) {
-    return <div>Select a file to preview</div>;
+    return (
+      <div className="flex flex-1 justify-center items-center">
+        Select a file to preview
+      </div>
+    );
   }
 
   if (!image) {
-    return <div>Loading image...</div>;
+    return (
+      <div className="flex flex-1 justify-center items-center">
+        Loading image...
+      </div>
+    );
   }
 
   return (
-    <div
-      className="flex items-start space-x-2"
-      style={{ width: 300, height: 300 }}
-    >
-      <img src={image} alt={file.path} />
-      <button onClick={closePreview}>Close</button>
+    <div className="w-full flex flex-col">
+      <div className="p-2 flex items-center justify-between border-b border-gray-600">
+        <div>{file.path}</div>
+        <button onClick={closePreview}>Close</button>
+      </div>
+      <div className="flex flex-1 justify-center items-center">
+        <img
+          src={image}
+          alt={file.path}
+          style={{ objectFit: "contain", width: "30vw" }}
+        />
+      </div>
     </div>
   );
 };
@@ -249,13 +263,21 @@ export default function Home() {
 
   return (
     <div className="p-16">
-      <div className="flex items-center">
-        <FileTree
-          nodes={fileTree}
-          onFileClick={onFileClick}
-          onCloseClick={onCloseClick}
-        />
-        <div className="flex justify-center" style={{ flex: 1 }}>
+      <div
+        className="flex rounded-lg border border-gray-600"
+        style={{ height: "80vh" }}
+      >
+        <div
+          className="px-4 border-r border-gray-600"
+          style={{ overflowY: "auto", flex: 1 }}
+        >
+          <FileTree
+            nodes={fileTree}
+            onFileClick={onFileClick}
+            onCloseClick={onCloseClick}
+          />
+        </div>
+        <div className="flex" style={{ flex: 3 }}>
           <FilePreview
             file={activeFile}
             hiddenKey={hiddenKey}
